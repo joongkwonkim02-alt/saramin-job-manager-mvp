@@ -50,12 +50,28 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   const status = parseStatus(query.status);
 
-  const [jobs, statusCounts, latestRun, updateRuns] = await Promise.all([
-    listJobsByStatus(user.id, status, selectedPreset.id),
-    getJobStatusCounts(user.id, selectedPreset.id),
-    getLatestUpdateRun(user.id, selectedPreset.id),
-    listUpdateRuns(user.id, 30),
-  ]);
+  let jobs = [] as Awaited<ReturnType<typeof listJobsByStatus>>;
+  let latestRun = null as Awaited<ReturnType<typeof getLatestUpdateRun>>;
+  let updateRuns = [] as Awaited<ReturnType<typeof listUpdateRuns>>;
+  let statusCounts: Record<JobStatus, number> = {
+    active: 0,
+    approved: 0,
+    rejected: 0,
+    hold: 0,
+    expired: 0,
+  };
+  let loadError = "";
+
+  try {
+    [jobs, statusCounts, latestRun, updateRuns] = await Promise.all([
+      listJobsByStatus(user.id, status, selectedPreset.id),
+      getJobStatusCounts(user.id, selectedPreset.id),
+      getLatestUpdateRun(user.id, selectedPreset.id),
+      listUpdateRuns(user.id, 30),
+    ]);
+  } catch (error) {
+    loadError = error instanceof Error ? error.message : "데이터를 불러오는 중 오류가 발생했습니다.";
+  }
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-6 md:px-8 dark:bg-slate-950">
@@ -108,6 +124,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             <StatusTabs status={status} presetId={selectedPreset.id} counts={statusCounts} />
           </CardContent>
         </Card>
+
+        {loadError ? (
+          <Card className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30">
+            <CardContent className="p-4 text-sm text-red-700 dark:text-red-300">
+              대시보드 데이터 조회 중 오류: {loadError}
+            </CardContent>
+          </Card>
+        ) : null}
 
         <FilterPresetsPanel
           presets={presets}

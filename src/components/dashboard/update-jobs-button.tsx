@@ -21,7 +21,11 @@ function toDateTimeText(value: string | null): string {
     return "-";
   }
 
-  return format(parseISO(value), "yyyy-MM-dd HH:mm:ss");
+  try {
+    return format(parseISO(value), "yyyy-MM-dd HH:mm:ss");
+  } catch {
+    return value;
+  }
 }
 
 export function UpdateJobsButton({ presetId, latestRun, updateRuns }: UpdateJobsButtonProps) {

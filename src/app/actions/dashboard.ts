@@ -81,116 +81,135 @@ export async function createPresetAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const user = await requireUser();
+  try {
+    const user = await requireUser();
 
-  const parsed = createPresetSchema.safeParse({
-    name: formData.get("name")?.toString() ?? "",
-    presetId: formData.get("presetId")?.toString() ?? "",
-  });
+    const parsed = createPresetSchema.safeParse({
+      name: formData.get("name")?.toString() ?? "",
+      presetId: formData.get("presetId")?.toString() ?? "",
+    });
 
-  if (!parsed.success) {
-    return {
-      ok: false,
-      message: parsed.error.issues[0]?.message ?? "프리셋 생성에 실패했습니다.",
-    };
-  }
-
-  const payload = {
-    userId: user.id,
-    name: parsed.data.name,
-    searchKeywords: parseArrayFromForm(formData, "searchKeywords"),
-    jobRoles: parseArrayFromForm(formData, "jobRoles"),
-    locations: parseArrayFromForm(formData, "locations"),
-    careerLevels: parseArrayFromForm(formData, "careerLevels"),
-    educationLevels: parseArrayFromForm(formData, "educationLevels"),
-  };
-
-  if (parsed.data.presetId) {
-    const existing = await getPresetById(user.id, parsed.data.presetId);
-
-    if (!existing) {
+    if (!parsed.success) {
       return {
         ok: false,
-        message: "수정할 프리셋을 찾을 수 없습니다.",
+        message: parsed.error.issues[0]?.message ?? "프리셋 생성에 실패했습니다.",
       };
     }
 
-    await updateFilterPreset({
-      ...payload,
-      presetId: parsed.data.presetId,
-    });
+    const payload = {
+      userId: user.id,
+      name: parsed.data.name,
+      searchKeywords: parseArrayFromForm(formData, "searchKeywords"),
+      jobRoles: parseArrayFromForm(formData, "jobRoles"),
+      locations: parseArrayFromForm(formData, "locations"),
+      careerLevels: parseArrayFromForm(formData, "careerLevels"),
+      educationLevels: parseArrayFromForm(formData, "educationLevels"),
+    };
+
+    if (parsed.data.presetId) {
+      const existing = await getPresetById(user.id, parsed.data.presetId);
+
+      if (!existing) {
+        return {
+          ok: false,
+          message: "수정할 프리셋을 찾을 수 없습니다.",
+        };
+      }
+
+      await updateFilterPreset({
+        ...payload,
+        presetId: parsed.data.presetId,
+      });
+
+      revalidatePath("/dashboard");
+
+      return {
+        ok: true,
+        message: "프리셋이 수정되었습니다.",
+      };
+    }
+
+    await createFilterPreset(payload);
 
     revalidatePath("/dashboard");
 
     return {
       ok: true,
-      message: "프리셋이 수정되었습니다.",
+      message: "프리셋이 저장되었습니다.",
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : "프리셋 처리 중 오류가 발생했습니다.",
     };
   }
-
-  await createFilterPreset(payload);
-
-  revalidatePath("/dashboard");
-
-  return {
-    ok: true,
-    message: "프리셋이 저장되었습니다.",
-  };
 }
 
 export async function setDefaultPresetAction(formData: FormData): Promise<void> {
-  const user = await requireUser();
-  const presetId = formData.get("presetId")?.toString();
+  try {
+    const user = await requireUser();
+    const presetId = formData.get("presetId")?.toString();
 
-  if (!presetId) {
-    return;
+    if (!presetId) {
+      return;
+    }
+
+    await setDefaultPreset(user.id, presetId);
+    revalidatePath("/dashboard");
+  } catch (error) {
+    console.error("setDefaultPresetAction failed:", error);
   }
-
-  await setDefaultPreset(user.id, presetId);
-  revalidatePath("/dashboard");
 }
 
 export async function togglePresetCollapsedAction(formData: FormData): Promise<void> {
-  const user = await requireUser();
-  const presetId = formData.get("presetId")?.toString();
-  const collapsed = formData.get("collapsed")?.toString() === "true";
+  try {
+    const user = await requireUser();
+    const presetId = formData.get("presetId")?.toString();
+    const collapsed = formData.get("collapsed")?.toString() === "true";
 
-  if (!presetId) {
-    return;
+    if (!presetId) {
+      return;
+    }
+
+    await setPresetCollapsed(user.id, presetId, collapsed);
+    revalidatePath("/dashboard");
+  } catch (error) {
+    console.error("togglePresetCollapsedAction failed:", error);
   }
-
-  await setPresetCollapsed(user.id, presetId, collapsed);
-  revalidatePath("/dashboard");
 }
 
 export async function deletePresetAction(formData: FormData): Promise<void> {
-  const user = await requireUser();
-  const presetId = formData.get("presetId")?.toString();
+  try {
+    const user = await requireUser();
+    const presetId = formData.get("presetId")?.toString();
 
-  if (!presetId) {
-    return;
-  }
-
-  const presets = await listFilterPresets(user.id);
-  if (presets.length <= 1) {
-    return;
-  }
-
-  const target = presets.find((preset) => preset.id === presetId);
-  if (!target) {
-    return;
-  }
-
-  await deleteFilterPreset(user.id, presetId);
-
-  if (target.is_default) {
-    const rest = presets.filter((preset) => preset.id !== presetId);
-    if (rest[0]) {
-      await setDefaultPreset(user.id, rest[0].id);
+    if (!presetId) {
+      return;
     }
-  }
 
-  revalidatePath("/dashboard");
+    const presets = await listFilterPresets(user.id);
+    if (presets.length <= 1) {
+      return;
+    }
+
+    const target = presets.find((preset) => preset.id === presetId);
+    if (!target) {
+      return;
+    }
+
+    await deleteFilterPreset(user.id, presetId);
+
+    if (target.is_default) {
+      const rest = presets.filter((preset) => preset.id !== presetId);
+      if (rest[0]) {
+        await setDefaultPreset(user.id, rest[0].id);
+      }
+    }
+
+    revalidatePath("/dashboard");
+  } catch (error) {
+    console.error("deletePresetAction failed:", error);
+  }
 }
 
 export async function updateJobsAction(
@@ -344,23 +363,27 @@ export async function updateJobsAction(
 }
 
 export async function changeJobStatusAction(formData: FormData): Promise<void> {
-  const user = await requireUser();
+  try {
+    const user = await requireUser();
 
-  const jobId = formData.get("jobId")?.toString();
-  const toStatus = formData.get("toStatus")?.toString() as JobStatus;
+    const jobId = formData.get("jobId")?.toString();
+    const toStatus = formData.get("toStatus")?.toString() as JobStatus;
 
-  if (!jobId || !toStatus) {
-    return;
+    if (!jobId || !toStatus) {
+      return;
+    }
+
+    await updateJobStatus({
+      jobId,
+      userId: user.id,
+      toStatus,
+      reason: "manual_decision",
+    });
+
+    revalidatePath("/dashboard");
+  } catch (error) {
+    console.error("changeJobStatusAction failed:", error);
   }
-
-  await updateJobStatus({
-    jobId,
-    userId: user.id,
-    toStatus,
-    reason: "manual_decision",
-  });
-
-  revalidatePath("/dashboard");
 }
 
 export async function resetJobsAndLogsAction(
@@ -370,12 +393,19 @@ export async function resetJobsAndLogsAction(
   void prev;
   void formData;
 
-  const user = await requireUser();
-  await resetCollectedJobsAndLogs(user.id);
-  revalidatePath("/dashboard");
+  try {
+    const user = await requireUser();
+    await resetCollectedJobsAndLogs(user.id);
+    revalidatePath("/dashboard");
 
-  return {
-    ok: true,
-    message: "공고와 업데이트 로그를 초기화했습니다.",
-  };
+    return {
+      ok: true,
+      message: "공고와 업데이트 로그를 초기화했습니다.",
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : "초기화 중 오류가 발생했습니다.",
+    };
+  }
 }
