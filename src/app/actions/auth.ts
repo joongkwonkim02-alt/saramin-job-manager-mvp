@@ -4,13 +4,12 @@ import { addMinutes, format } from "date-fns";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import type { Provider as SupabaseOAuthProvider } from "@supabase/auth-js";
 
 import { ensureUserProfile } from "@/lib/auth";
 import { authConfig, getEnv } from "@/lib/env";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { OAuthProvider, UserProfile } from "@/lib/types";
+import type { UserProfile } from "@/lib/types";
 
 interface AuthActionState {
   ok: boolean;
@@ -28,10 +27,6 @@ const signInSchema = z.object({
   password: z.string().min(1, "비밀번호를 입력해주세요."),
 });
 
-const oauthProviderSchema = z.enum(["google", "kakao", "naver"]);
-
-type OAuthStartProvider = z.infer<typeof oauthProviderSchema>;
-
 async function findUserProfileByEmail(emailLower: string): Promise<UserProfile | null> {
   const admin = createSupabaseAdminClient();
   const { data, error } = await admin
@@ -47,17 +42,13 @@ async function findUserProfileByEmail(emailLower: string): Promise<UserProfile |
   return (data as UserProfile | null) ?? null;
 }
 
-async function registerOAuthAccount(input: {
-  userId: string;
-  provider: OAuthProvider;
-  providerUserId?: string;
-}) {
+async function registerEmailAccount(userId: string): Promise<void> {
   const admin = createSupabaseAdminClient();
   await admin.from("oauth_accounts").upsert(
     {
-      user_id: input.userId,
-      provider: input.provider,
-      provider_user_id: input.providerUserId ?? input.userId,
+      user_id: userId,
+      provider: "email",
+      provider_user_id: userId,
       metadata: {},
     },
     { onConflict: "user_id,provider" },
@@ -97,27 +88,6 @@ async function resetLoginFailure(userId: string): Promise<void> {
       last_login_at: new Date().toISOString(),
     })
     .eq("id", userId);
-}
-
-function getOAuthErrorMessage(provider: OAuthStartProvider): string {
-  if (provider === "google") {
-    return "Google OAuth URL 생성에 실패했습니다.";
-  }
-
-  if (provider === "kakao") {
-    return "Kakao OAuth URL 생성에 실패했습니다.";
-  }
-
-  return "Naver OAuth URL 생성에 실패했습니다.";
-}
-
-function toSupabaseOAuthProvider(provider: OAuthStartProvider): SupabaseOAuthProvider {
-  if (provider === "naver") {
-    // Supabase native Provider type has no "naver", so use custom OIDC provider id.
-    return "custom:naver";
-  }
-
-  return provider;
 }
 
 export async function signUpAction(
@@ -215,53 +185,10 @@ export async function signInAction(
 
   await ensureUserProfile(data.user.id, emailLower);
   await resetLoginFailure(data.user.id);
-  await registerOAuthAccount({
-    userId: data.user.id,
-    provider: "email",
-    providerUserId: data.user.id,
-  });
+  await registerEmailAccount(data.user.id);
 
   revalidatePath("/dashboard");
   redirect("/dashboard");
-}
-
-export async function startOAuthAction(formData: FormData) {
-  const providerRaw = formData.get("provider")?.toString() ?? "";
-  const providerParsed = oauthProviderSchema.safeParse(providerRaw);
-
-  if (!providerParsed.success) {
-    redirect(`/auth/login?error=${encodeURIComponent("지원하지 않는 OAuth 제공자입니다.")}`);
-  }
-
-  const provider = providerParsed.data;
-  const supabaseProvider = toSupabaseOAuthProvider(provider);
-  const supabase = await createSupabaseServerClient();
-
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: supabaseProvider,
-    options: {
-      redirectTo: `${getEnv("NEXT_PUBLIC_SITE_URL")}/auth/callback?next=/dashboard&oauth_provider=${provider}`,
-      queryParams:
-        provider === "google"
-          ? {
-              access_type: "offline",
-              prompt: "consent",
-            }
-          : undefined,
-    },
-  });
-
-  if (error) {
-    redirect(`/auth/login?error=${encodeURIComponent(error.message)}`);
-  }
-
-  if (!data.url) {
-    redirect(
-      `/auth/login?error=${encodeURIComponent(getOAuthErrorMessage(provider))}`,
-    );
-  }
-
-  redirect(data.url);
 }
 
 export async function signOutAction() {
@@ -269,12 +196,4 @@ export async function signOutAction() {
   await supabase.auth.signOut();
 
   redirect("/auth/login");
-}
-
-export async function syncOAuthAccountAfterCallback(input: {
-  userId: string;
-  provider: OAuthProvider;
-  providerUserId?: string;
-}) {
-  await registerOAuthAccount(input);
 }
