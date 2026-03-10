@@ -1,10 +1,19 @@
-﻿import { LoginForm } from "@/components/auth/login-form";
+﻿import { redirect } from "next/navigation";
+
+import { LoginForm } from "@/components/auth/login-form";
+import { getCurrentUser } from "@/lib/auth";
 
 interface LoginPageProps {
   searchParams: Promise<{ error?: string }>;
 }
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const user = await getCurrentUser();
+
+  if (user) {
+    redirect("/dashboard");
+  }
+
   const query = await searchParams;
 
   return (
