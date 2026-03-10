@@ -4,6 +4,7 @@ import { addMinutes, format } from "date-fns";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import type { Provider as SupabaseOAuthProvider } from "@supabase/auth-js";
 
 import { ensureUserProfile } from "@/lib/auth";
 import { authConfig, getEnv } from "@/lib/env";
@@ -26,6 +27,10 @@ const signInSchema = z.object({
   email: z.string().email("유효한 이메일을 입력해주세요."),
   password: z.string().min(1, "비밀번호를 입력해주세요."),
 });
+
+const oauthProviderSchema = z.enum(["google", "kakao", "naver"]);
+
+type OAuthStartProvider = z.infer<typeof oauthProviderSchema>;
 
 async function findUserProfileByEmail(emailLower: string): Promise<UserProfile | null> {
   const admin = createSupabaseAdminClient();
@@ -92,6 +97,27 @@ async function resetLoginFailure(userId: string): Promise<void> {
       last_login_at: new Date().toISOString(),
     })
     .eq("id", userId);
+}
+
+function getOAuthErrorMessage(provider: OAuthStartProvider): string {
+  if (provider === "google") {
+    return "Google OAuth URL 생성에 실패했습니다.";
+  }
+
+  if (provider === "kakao") {
+    return "Kakao OAuth URL 생성에 실패했습니다.";
+  }
+
+  return "Naver OAuth URL 생성에 실패했습니다.";
+}
+
+function toSupabaseOAuthProvider(provider: OAuthStartProvider): SupabaseOAuthProvider {
+  if (provider === "naver") {
+    // Supabase native Provider type has no "naver", so use custom OIDC provider id.
+    return "custom:naver";
+  }
+
+  return provider;
 }
 
 export async function signUpAction(
@@ -199,17 +225,29 @@ export async function signInAction(
   redirect("/dashboard");
 }
 
-export async function startGoogleOAuthAction() {
+export async function startOAuthAction(formData: FormData) {
+  const providerRaw = formData.get("provider")?.toString() ?? "";
+  const providerParsed = oauthProviderSchema.safeParse(providerRaw);
+
+  if (!providerParsed.success) {
+    redirect(`/auth/login?error=${encodeURIComponent("지원하지 않는 OAuth 제공자입니다.")}`);
+  }
+
+  const provider = providerParsed.data;
+  const supabaseProvider = toSupabaseOAuthProvider(provider);
   const supabase = await createSupabaseServerClient();
 
   const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
+    provider: supabaseProvider,
     options: {
-      redirectTo: `${getEnv("NEXT_PUBLIC_SITE_URL")}/auth/callback?next=/dashboard`,
-      queryParams: {
-        access_type: "offline",
-        prompt: "consent",
-      },
+      redirectTo: `${getEnv("NEXT_PUBLIC_SITE_URL")}/auth/callback?next=/dashboard&oauth_provider=${provider}`,
+      queryParams:
+        provider === "google"
+          ? {
+              access_type: "offline",
+              prompt: "consent",
+            }
+          : undefined,
     },
   });
 
@@ -219,7 +257,7 @@ export async function startGoogleOAuthAction() {
 
   if (!data.url) {
     redirect(
-      `/auth/login?error=${encodeURIComponent("Google OAuth URL 생성에 실패했습니다.")}`,
+      `/auth/login?error=${encodeURIComponent(getOAuthErrorMessage(provider))}`,
     );
   }
 

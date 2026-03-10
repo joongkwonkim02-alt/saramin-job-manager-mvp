@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { useActionState } from "react";
 
-import { signInAction, startGoogleOAuthAction } from "@/app/actions/auth";
-import { Button } from "@/components/ui/button";
+import { signInAction, startOAuthAction } from "@/app/actions/auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +11,17 @@ import { PendingButton } from "@/components/ui/pending-button";
 
 interface LoginFormProps {
   errorMessage?: string;
+}
+
+function OAuthButton({ provider, label }: { provider: "google" | "kakao" | "naver"; label: string }) {
+  return (
+    <form action={startOAuthAction}>
+      <input type="hidden" name="provider" value={provider} />
+      <PendingButton variant="outline" className="w-full" pendingLabel="이동 중...">
+        {label}
+      </PendingButton>
+    </form>
+  );
 }
 
 export function LoginForm({ errorMessage }: LoginFormProps) {
@@ -24,7 +34,9 @@ export function LoginForm({ errorMessage }: LoginFormProps) {
     <Card className="w-full max-w-md">
       <CardHeader>
         <CardTitle>로그인</CardTitle>
-        <CardDescription>이메일/비밀번호 또는 Google 로그인으로 시작하세요.</CardDescription>
+        <CardDescription>
+          이메일/비밀번호 또는 Google, Kakao, Naver OAuth 로그인으로 시작하세요.
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <form action={formAction} className="space-y-3">
@@ -41,19 +53,10 @@ export function LoginForm({ errorMessage }: LoginFormProps) {
           </PendingButton>
         </form>
 
-        <form action={startGoogleOAuthAction}>
-          <PendingButton variant="outline" className="w-full" pendingLabel="이동 중...">
-            Google로 로그인
-          </PendingButton>
-        </form>
-
-        <div className="grid grid-cols-2 gap-2">
-          <Button type="button" variant="secondary" disabled>
-            Kakao (예정)
-          </Button>
-          <Button type="button" variant="secondary" disabled>
-            Naver (예정)
-          </Button>
+        <div className="space-y-2">
+          <OAuthButton provider="google" label="Google로 로그인" />
+          <OAuthButton provider="kakao" label="Kakao로 로그인" />
+          <OAuthButton provider="naver" label="Naver로 로그인" />
         </div>
 
         {state.message ? (

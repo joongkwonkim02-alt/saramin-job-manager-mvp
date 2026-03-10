@@ -1,13 +1,21 @@
 ﻿import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { ensureUserProfile } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { OAuthProvider } from "@/lib/types";
 
+const oauthProviderParamSchema = z.enum(["google", "kakao", "naver"]);
+
 function toProvider(value: string | undefined): OAuthProvider {
   if (value === "google" || value === "kakao" || value === "naver") {
     return value;
+  }
+
+  // Supabase custom OIDC provider(eg. custom:naver) can appear as "custom".
+  if (value === "custom") {
+    return "naver";
   }
 
   return "email";
@@ -34,6 +42,7 @@ export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
   const next = requestUrl.searchParams.get("next") ?? "/dashboard";
+  const oauthProviderParam = requestUrl.searchParams.get("oauth_provider") ?? "";
 
   const supabase = await createSupabaseServerClient();
 
@@ -48,7 +57,11 @@ export async function GET(request: Request) {
   if (user?.id && user.email) {
     await ensureUserProfile(user.id, user.email);
 
-    const provider = toProvider(user.app_metadata?.provider);
+    const providerFromParam = oauthProviderParamSchema.safeParse(oauthProviderParam);
+    const provider = providerFromParam.success
+      ? providerFromParam.data
+      : toProvider(user.app_metadata?.provider);
+
     await registerOAuthAccount({
       userId: user.id,
       provider,

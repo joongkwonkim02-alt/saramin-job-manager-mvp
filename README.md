@@ -22,7 +22,7 @@
 ## 2) 화면 구조
 
 - `/auth/signup`: 회원가입(이메일 인증 메일 발송 구조)
-- `/auth/login`: 이메일/비밀번호 로그인 + Google OAuth + Kakao/Naver 확장 슬롯
+- `/auth/login`: 이메일/비밀번호 로그인 + Google/Kakao/Naver OAuth
 - `/dashboard`
   - 상단: 선택 프리셋 요약 + 공고 업데이트 버튼 + 상태 탭
   - 중단: 필터 프리셋 관리(저장, 기본 지정, 접기/펼치기)
@@ -80,7 +80,7 @@
 
 Server Actions:
 - `src/app/actions/auth.ts`
-  - `signUpAction`, `signInAction`, `startGoogleOAuthAction`, `signOutAction`
+  - `signUpAction`, `signInAction`, `startOAuthAction`, `signOutAction`
 - `src/app/actions/dashboard.ts`
   - `createPresetAction`, `setDefaultPresetAction`, `togglePresetCollapsedAction`
   - `updateJobsAction`, `changeJobStatusAction`
@@ -191,6 +191,22 @@ Vercel 또는 Netlify에 배포 가능.
 - `NEXT_PUBLIC_SITE_URL`
 - `AUTH_LOGIN_MAX_ATTEMPTS`
 - `AUTH_LOGIN_LOCK_MINUTES`
+
+## OAuth 설정 (Google/Kakao/Naver)
+
+1. Supabase Dashboard > Authentication > Providers 설정
+   - `Google` 활성화
+   - `Kakao` 활성화
+   - `Naver`는 `Custom OAuth / OIDC`로 provider id를 `naver`로 생성
+2. 각 Provider 콘솔(구글/카카오/네이버 개발자센터) Redirect URI에 아래 등록
+   - `https://<SUPABASE_PROJECT_REF>.supabase.co/auth/v1/callback`
+3. Supabase Dashboard > Authentication > URL Configuration
+   - Site URL:
+     - Production: `https://saramin-job-manager-mvp.netlify.app`
+     - Local: `http://localhost:3000`
+   - Redirect URLs:
+     - `https://saramin-job-manager-mvp.netlify.app/auth/callback`
+     - `http://localhost:3000/auth/callback`
 
 ## 컴플라이언스/수집 정책
 
