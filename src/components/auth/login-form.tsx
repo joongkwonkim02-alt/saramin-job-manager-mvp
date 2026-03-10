@@ -46,9 +46,9 @@ export function LoginForm({ errorMessage }: LoginFormProps) {
 
         {errorMessage ? <p className="text-sm text-red-600">{errorMessage}</p> : null}
 
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-slate-600 dark:text-slate-300">
           계정이 없나요?{" "}
-          <Link className="font-semibold text-slate-900 underline" href="/auth/signup">
+          <Link className="font-semibold text-slate-900 underline dark:text-slate-100" href="/auth/signup">
             회원가입
           </Link>
         </p>

@@ -45,14 +45,14 @@ export function SignupForm() {
         ) : null}
 
         {state.ok ? (
-          <Link className="text-sm font-semibold text-slate-900 underline" href="/auth/verify-email">
+          <Link className="text-sm font-semibold text-slate-900 underline dark:text-slate-100" href="/auth/verify-email">
             인증 안내 페이지로 이동
           </Link>
         ) : null}
 
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-slate-600 dark:text-slate-300">
           이미 계정이 있나요?{" "}
-          <Link className="font-semibold text-slate-900 underline" href="/auth/login">
+          <Link className="font-semibold text-slate-900 underline dark:text-slate-100" href="/auth/login">
             로그인
           </Link>
         </p>

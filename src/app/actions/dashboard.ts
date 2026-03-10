@@ -10,15 +10,19 @@ import {
   createFilterPreset,
   createJob,
   createUpdateRun,
+  deleteFilterPreset,
   ensureBootstrapPreset,
   expirePastJobs,
   finishUpdateRun,
   getPresetById,
   listAllJobsForUser,
+  listFilterPresets,
   logJobState,
+  resetCollectedJobsAndLogs,
   setDefaultPreset,
   setPresetCollapsed,
   updateJobStatus,
+  updateFilterPreset,
   upsertCompany,
   upsertExternalCompanyLink,
 } from "@/lib/services/repository";
@@ -41,7 +45,37 @@ interface UpdateJobsState extends ActionState {
 
 const createPresetSchema = z.object({
   name: z.string().trim().min(1, "프리셋 이름을 입력해주세요."),
+  presetId: z.string().uuid().optional().or(z.literal("")),
 });
+
+function parseArrayFromForm(formData: FormData, field: string): string[] {
+  const allValues = formData
+    .getAll(field)
+    .map((value) => value.toString().trim())
+    .filter(Boolean);
+
+  if (allValues.length > 1) {
+    return [...new Set(allValues)];
+  }
+
+  const raw = allValues[0] ?? formData.get(field)?.toString().trim();
+  if (!raw) {
+    return [];
+  }
+
+  if (raw.startsWith("[") && raw.endsWith("]")) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return [...new Set(parsed.map((value) => String(value).trim()).filter(Boolean))];
+      }
+    } catch {
+      // Fall through to comma parsing for backward compatibility.
+    }
+  }
+
+  return parseList(raw);
+}
 
 export async function createPresetAction(
   _prev: ActionState,
@@ -51,6 +85,7 @@ export async function createPresetAction(
 
   const parsed = createPresetSchema.safeParse({
     name: formData.get("name")?.toString() ?? "",
+    presetId: formData.get("presetId")?.toString() ?? "",
   });
 
   if (!parsed.success) {
@@ -60,15 +95,40 @@ export async function createPresetAction(
     };
   }
 
-  await createFilterPreset({
+  const payload = {
     userId: user.id,
     name: parsed.data.name,
-    searchKeywords: parseList(formData.get("searchKeywords")),
-    jobRoles: parseList(formData.get("jobRoles")),
-    locations: parseList(formData.get("locations")),
-    careerLevels: parseList(formData.get("careerLevels")),
-    educationLevels: parseList(formData.get("educationLevels")),
-  });
+    searchKeywords: parseArrayFromForm(formData, "searchKeywords"),
+    jobRoles: parseArrayFromForm(formData, "jobRoles"),
+    locations: parseArrayFromForm(formData, "locations"),
+    careerLevels: parseArrayFromForm(formData, "careerLevels"),
+    educationLevels: parseArrayFromForm(formData, "educationLevels"),
+  };
+
+  if (parsed.data.presetId) {
+    const existing = await getPresetById(user.id, parsed.data.presetId);
+
+    if (!existing) {
+      return {
+        ok: false,
+        message: "수정할 프리셋을 찾을 수 없습니다.",
+      };
+    }
+
+    await updateFilterPreset({
+      ...payload,
+      presetId: parsed.data.presetId,
+    });
+
+    revalidatePath("/dashboard");
+
+    return {
+      ok: true,
+      message: "프리셋이 수정되었습니다.",
+    };
+  }
+
+  await createFilterPreset(payload);
 
   revalidatePath("/dashboard");
 
@@ -100,6 +160,36 @@ export async function togglePresetCollapsedAction(formData: FormData): Promise<v
   }
 
   await setPresetCollapsed(user.id, presetId, collapsed);
+  revalidatePath("/dashboard");
+}
+
+export async function deletePresetAction(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const presetId = formData.get("presetId")?.toString();
+
+  if (!presetId) {
+    return;
+  }
+
+  const presets = await listFilterPresets(user.id);
+  if (presets.length <= 1) {
+    return;
+  }
+
+  const target = presets.find((preset) => preset.id === presetId);
+  if (!target) {
+    return;
+  }
+
+  await deleteFilterPreset(user.id, presetId);
+
+  if (target.is_default) {
+    const rest = presets.filter((preset) => preset.id !== presetId);
+    if (rest[0]) {
+      await setDefaultPreset(user.id, rest[0].id);
+    }
+  }
+
   revalidatePath("/dashboard");
 }
 
@@ -211,6 +301,14 @@ export async function updateJobsAction(
       rawPayload: {
         presetId: preset.id,
         collectedCount: collectedJobs.length,
+        matchingMode: "strict",
+        filters: {
+          searchKeywords: preset.search_keywords,
+          jobRoles: preset.job_roles,
+          locations: preset.locations,
+          careerLevels: preset.career_levels,
+          educationLevels: preset.education_levels,
+        },
       },
     });
 
@@ -263,4 +361,21 @@ export async function changeJobStatusAction(formData: FormData): Promise<void> {
   });
 
   revalidatePath("/dashboard");
+}
+
+export async function resetJobsAndLogsAction(
+  prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  void prev;
+  void formData;
+
+  const user = await requireUser();
+  await resetCollectedJobsAndLogs(user.id);
+  revalidatePath("/dashboard");
+
+  return {
+    ok: true,
+    message: "공고와 업데이트 로그를 초기화했습니다.",
+  };
 }

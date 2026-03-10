@@ -25,8 +25,25 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko">
+    <html lang="ko" suppressHydrationWarning>
       <body className={`${notoSansKr.variable} ${jetBrainsMono.variable} font-sans antialiased`}>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function () {
+                try {
+                  var key = "saramin-theme";
+                  var stored = localStorage.getItem(key);
+                  var theme = stored === "dark" || stored === "light"
+                    ? stored
+                    : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+                  document.documentElement.classList.toggle("dark", theme === "dark");
+                  document.documentElement.style.colorScheme = theme;
+                } catch (_) {}
+              })();
+            `,
+          }}
+        />
         {children}
       </body>
     </html>

@@ -93,7 +93,7 @@ export function AnalysisWorkspace({
             {approvedJobs.map((job) => (
               <div key={job.id} className="rounded border p-2">
                 <p className="font-medium">{job.title}</p>
-                <p className="text-slate-600">마감일: {displayOrDash(job.deadline)}</p>
+                <p className="text-slate-600 dark:text-slate-300">마감일: {displayOrDash(job.deadline)}</p>
               </div>
             ))}
           </CardContent>
@@ -126,7 +126,7 @@ export function AnalysisWorkspace({
                   id="status"
                   name="status"
                   defaultValue={record.status}
-                  className="h-9 w-full rounded-md border border-slate-300 px-3 text-sm"
+                  className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-950"
                 >
                   <option value="draft">draft</option>
                   <option value="in_review">in_review</option>
@@ -156,13 +156,13 @@ export function AnalysisWorkspace({
                 <div key={score.id} className="flex items-center justify-between rounded border p-2">
                   <div>
                     <p className="font-medium">{score.metric_label}</p>
-                    <p className="text-slate-600">{score.metric_key}</p>
+                    <p className="text-slate-600 dark:text-slate-300">{score.metric_key}</p>
                   </div>
                   <Badge variant="secondary">{score.score}</Badge>
                 </div>
               ))
             ) : (
-              <p className="text-slate-600">아직 점수가 없습니다.</p>
+              <p className="text-slate-600 dark:text-slate-300">아직 점수가 없습니다.</p>
             )}
           </CardContent>
         </Card>
@@ -219,8 +219,10 @@ export function AnalysisWorkspace({
             {template.section_schema.map((section) => (
               <div key={section.key} className="rounded border p-2">
                 <p className="font-medium">{section.title}</p>
-                <p className="text-slate-600">key: {section.key}</p>
-                {section.description ? <p className="text-slate-500">{section.description}</p> : null}
+                <p className="text-slate-600 dark:text-slate-300">key: {section.key}</p>
+                {section.description ? (
+                  <p className="text-slate-500 dark:text-slate-400">{section.description}</p>
+                ) : null}
               </div>
             ))}
           </CardContent>
@@ -235,12 +237,12 @@ export function AnalysisWorkspace({
               sections.map((section) => (
                 <div key={section.id} className="rounded border p-2">
                   <p className="font-medium">{section.title}</p>
-                  <p className="text-slate-500">key: {section.section_key}</p>
+                  <p className="text-slate-500 dark:text-slate-400">key: {section.section_key}</p>
                   <p>{displayOrDash(section.content)}</p>
                 </div>
               ))
             ) : (
-              <p className="text-slate-600">아직 저장된 섹션이 없습니다.</p>
+              <p className="text-slate-600 dark:text-slate-300">아직 저장된 섹션이 없습니다.</p>
             )}
           </CardContent>
         </Card>
@@ -301,7 +303,7 @@ export function AnalysisWorkspace({
                 </div>
               ))
             ) : (
-              <p className="text-slate-600">연결된 외부 링크가 없습니다.</p>
+              <p className="text-slate-600 dark:text-slate-300">연결된 외부 링크가 없습니다.</p>
             )}
           </CardContent>
         </Card>
@@ -312,7 +314,7 @@ export function AnalysisWorkspace({
           <CardHeader>
             <CardTitle>비교 기능 확장 포인트</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm text-slate-700">
+          <CardContent className="space-y-3 text-sm text-slate-700 dark:text-slate-300">
             <p>
               현재는 <code>company_comparison_sets</code>, <code>company_comparison_items</code> 구조로 비교 대상을
               저장합니다. 실제 비교 리포트 렌더링은 2차 구현 단계로 분리되어 있습니다.

@@ -7,6 +7,10 @@ export interface CollectedJob {
   title: string;
   companyName: string;
   location: string;
+  locationTags: string[];
+  roleTags: string[];
+  careerLevel: string;
+  educationLevel: string;
   employeeCount: number | null;
   industry: string | null;
   companyType: string | null;

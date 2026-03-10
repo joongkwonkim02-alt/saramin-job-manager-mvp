@@ -51,9 +51,9 @@ export async function ensureBootstrapPreset(userId: string): Promise<FilterPrese
       user_id: userId,
       name: "기본 프리셋",
       search_keywords: ["백엔드", "풀스택"],
-      job_roles: ["개발자"],
-      locations: ["서울", "경기"],
-      career_levels: ["신입", "경력"],
+      job_roles: ["백엔드개발", "풀스택개발"],
+      locations: ["서울 전체", "경기 전체"],
+      career_levels: ["신입"],
       education_levels: ["대졸"],
       is_default: true,
       collapsed: false,
@@ -98,6 +98,48 @@ export async function createFilterPreset(input: {
   }
 
   return data as FilterPreset;
+}
+
+export async function updateFilterPreset(input: {
+  userId: string;
+  presetId: string;
+  name: string;
+  searchKeywords: string[];
+  jobRoles: string[];
+  locations: string[];
+  careerLevels: string[];
+  educationLevels: string[];
+}): Promise<void> {
+  const admin = createSupabaseAdminClient();
+  const { error } = await admin
+    .from("filter_presets")
+    .update({
+      name: input.name,
+      search_keywords: input.searchKeywords,
+      job_roles: input.jobRoles,
+      locations: input.locations,
+      career_levels: input.careerLevels,
+      education_levels: input.educationLevels,
+    })
+    .eq("user_id", input.userId)
+    .eq("id", input.presetId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function deleteFilterPreset(userId: string, presetId: string): Promise<void> {
+  const admin = createSupabaseAdminClient();
+  const { error } = await admin
+    .from("filter_presets")
+    .delete()
+    .eq("user_id", userId)
+    .eq("id", presetId);
+
+  if (error) {
+    throw error;
+  }
 }
 
 export async function setDefaultPreset(userId: string, presetId: string): Promise<void> {
@@ -158,15 +200,25 @@ export async function getPresetById(userId: string, presetId: string): Promise<F
   return (data as FilterPreset | null) ?? null;
 }
 
-export async function listJobsByStatus(userId: string, status: JobStatus): Promise<JobWithRelations[]> {
+export async function listJobsByStatus(
+  userId: string,
+  status: JobStatus,
+  presetId?: string,
+): Promise<JobWithRelations[]> {
   const admin = createSupabaseAdminClient();
-  const { data: jobs, error: jobsError } = await admin
+  let query = admin
     .from("jobs")
     .select("*")
     .eq("user_id", userId)
     .eq("status", status)
     .order("deadline", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: false });
+
+  if (presetId) {
+    query = query.eq("preset_id", presetId);
+  }
+
+  const { data: jobs, error: jobsError } = await query;
 
   if (jobsError) {
     throw jobsError;
@@ -221,12 +273,19 @@ export async function listJobsByStatus(userId: string, status: JobStatus): Promi
 
 export async function getJobStatusCounts(
   userId: string,
+  presetId?: string,
 ): Promise<Record<JobStatus, number>> {
   const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
+  let query = admin
     .from("jobs")
     .select("status")
     .eq("user_id", userId);
+
+  if (presetId) {
+    query = query.eq("preset_id", presetId);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw error;
@@ -529,21 +588,73 @@ export async function finishUpdateRun(input: {
   }
 }
 
-export async function getLatestUpdateRun(userId: string): Promise<UpdateRun | null> {
+export async function getLatestUpdateRun(userId: string, presetId?: string): Promise<UpdateRun | null> {
   const admin = createSupabaseAdminClient();
-  const { data, error } = await admin
+  let query = admin
     .from("update_runs")
     .select("*")
     .eq("user_id", userId)
     .order("started_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .limit(1);
+
+  if (presetId) {
+    query = query.eq("preset_id", presetId);
+  }
+
+  const { data, error } = await query.maybeSingle();
 
   if (error) {
     throw error;
   }
 
   return (data as UpdateRun | null) ?? null;
+}
+
+export async function listUpdateRuns(userId: string, limit = 20): Promise<UpdateRun[]> {
+  const admin = createSupabaseAdminClient();
+  const { data, error } = await admin
+    .from("update_runs")
+    .select("*")
+    .eq("user_id", userId)
+    .order("started_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as UpdateRun[];
+}
+
+export async function resetCollectedJobsAndLogs(userId: string): Promise<void> {
+  const admin = createSupabaseAdminClient();
+
+  const { error: deleteLogsError } = await admin
+    .from("job_state_logs")
+    .delete()
+    .eq("user_id", userId);
+
+  if (deleteLogsError) {
+    throw deleteLogsError;
+  }
+
+  const { error: deleteJobsError } = await admin
+    .from("jobs")
+    .delete()
+    .eq("user_id", userId);
+
+  if (deleteJobsError) {
+    throw deleteJobsError;
+  }
+
+  const { error: deleteRunsError } = await admin
+    .from("update_runs")
+    .delete()
+    .eq("user_id", userId);
+
+  if (deleteRunsError) {
+    throw deleteRunsError;
+  }
 }
 
 export async function ensureDefaultAnalysisTemplate(userId: string): Promise<CompanyAnalysisTemplate> {
