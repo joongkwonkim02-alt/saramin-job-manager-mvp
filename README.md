@@ -182,7 +182,7 @@ Vercel 또는 Netlify에 배포 가능.
 - Build command: `npm run build`
 - Publish: Next.js 런타임(플랫폼 기본 감지)
 - Environment variables: `.env.local`과 동일 키 등록
-- GitHub 자동 배포: `.github/workflows/netlify-deploy.yml`에서 Netlify Build Hook 호출
+- GitHub 자동 배포: `.github/workflows/netlify-deploy.yml`에서 Netlify CLI(`NETLIFY_AUTH_TOKEN`, `NETLIFY_SITE_ID` 시크릿 사용)로 프로덕션 배포
 
 필수 Netlify 환경변수:
 - `NEXT_PUBLIC_SUPABASE_URL`
